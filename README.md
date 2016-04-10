@@ -1,0 +1,6 @@
+
+Phase A: Implementation of malloc and free functions :
+
+The basic functionality of malloc( size t size ) is to return a pointer to a block of the requested size. This memory comes from a memory resource managed by the malloc() and free() functions. To emulate physical memory, you will create a static char array of size 8MB. You will maintain all your bookkeeping state in this array and allocate memory from it as well. Your memory manager will manage memory for your thread library and will presume its existence. Its code should either be part of your thread library, or be in an included library. 
+
+All malloc requests from the same thread should be served from the same memory page, until they fill that page. At this stage, if a thread requests more than a system page's worth of memory, you should consider its memory full, and return NULL pointers to all subsequent malloc requests. In order to achieve this, your memory functions should communicate with your thread scheduler to determine which thread is currently running, so that it can know who made the request and which memory page to allocate or free memory from
