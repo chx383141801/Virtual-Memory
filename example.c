@@ -21,7 +21,7 @@ void my_thread1()
         printf("Overflow\n");
     }
     d = (char*)c;
-    d = "raghav";
+    d = "abcd";
     printf("%s\n", d);             
     //mutex_unlock(&mutex);
     e = (void*)myallocate(3000,1); 
@@ -29,7 +29,7 @@ void my_thread1()
     {
         printf("Overflow\n");
     } 
-    f ="honey";
+    f ="xyz";
     printf("%s\n", f);    
 }
 

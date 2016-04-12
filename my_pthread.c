@@ -11,7 +11,6 @@ http://lists.apple.com/archives/darwin-dev/2008/Jan/msg00229.html */
 #include <stdlib.h>
 #include <ucontext.h>
 #include <time.h>
-#include "queue.h"
 #include <sys/time.h>
 #include <assert.h>
 #include <string.h>
@@ -34,6 +33,7 @@ typedef struct
 	void* stack; 
 	int priority;
 	void *start_address;
+	void *end_address;
 	int current_index;
 } myThread;
 /* The thread "queue" */
@@ -76,11 +76,15 @@ void *sbrk1(int nbytes)
 	index = current_index;
 	current_index = current_index + nbytes;
 	base = (void*)(memory+index);
+	return base;
 }
 struct block_meta *find_free_block(struct block_meta **last, size_t size) {
   struct block_meta *current = global_base;
-  while (current && (current->free && current->size < size)) {
+  while (current != NULL) 
+  {
     *last = current;
+    if((*last)->free == 1)
+    	break;
     current = current->next;
   }
   return current;
@@ -88,10 +92,8 @@ struct block_meta *find_free_block(struct block_meta **last, size_t size) {
 
 struct block_meta *request_space(struct block_meta* last, size_t size) {
   struct block_meta *block;
-  block = (struct block_meta *)sbrk1(0);
-  void *request = (void*)sbrk1(size + META_SIZE);
-  assert((void*)block == request); // Not thread safe.
-  if (request == (void*) -1) {
+  block = (struct block_meta *)sbrk1(size + META_SIZE);
+  if (block == NULL) {
     return NULL; // sbrk failed.
   }
 
@@ -110,17 +112,40 @@ struct block_meta *get_block_ptr(void *ptr) {
 void *myallocate_thread(int size)
 {	
 	void *base;int index;
+	struct block_meta *block, *temp;
+	struct block_meta *current = global_base;
 	if(size+threadList[currentThread].current_index>4095)
-		return NULL;
+	{
+  		block = (struct block_meta *)sbrk1(4095 + META_SIZE);
+  		if(block == NULL)
+  			return NULL;
+  		block->size = 4095;
+		block->next = NULL;
+		block->free = 0;
+		block->owner_thread = numThreads;
+		while(current->owner_thread != currentThread)
+			current = current->next;
+		temp = current->next;
+		while(temp!=NULL && temp->owner_thread == currentThread)
+		{
+			current = temp;
+			temp = temp->next;
+		}
+		current->next = block;
+		block->next = temp;
+		threadList[currentThread].end_address = (void *)(block + 1) + 4095;
+		threadList[currentThread].current_index = 0;
+	}
 	index = threadList[currentThread].current_index;
 	threadList[currentThread].current_index = threadList[currentThread].current_index + size;
-	base = (void*)(threadList[currentThread].start_address+index);
+	base = (void*)(threadList[currentThread].end_address + index - 4095);
 	return base;
 
 }
 void *myallocate_self(int size)
 {
 	struct block_meta *block;
+	struct block_meta *last = global_base;
 	if (!global_base) { // First call.
     block = request_space(NULL, size);
     if (!block) 
@@ -130,7 +155,6 @@ void *myallocate_self(int size)
     global_base = block;
     } 
   else {
-    struct block_meta *last = global_base;
     block = find_free_block(&last, size);
     if (!block) 
     { // Failed to find free block.
@@ -164,7 +188,7 @@ void *myallocate(int size, int type) {
   	block = myallocate_self(size);
   }
   block->owner_thread = numThreads;
-  return(block+1);
+  return(block + 1);
 }
 
 void mydeallocate(void *ptr, int type) {
