@@ -50,7 +50,7 @@ typedef struct
 static myThread threadList[ MAX_THREADS ];
 
 /* The index of the currently executing thread----change it to -1 once tested */
-static int currentThread = -1;
+static int currentThread = 0;
 /* A boolean flag indicating if we are in the main process or if we are in a thread */
 static int inThread = 0;
 /* The number of active threads */
@@ -134,6 +134,7 @@ int swapout()
 	if(dest == NULL)
 		return 0;
 	memcpy(dest, threadList[thread].start_address, size);
+	threadList[thread].swapped = 1;
 	current_index_swap = current_index_swap + size;
 	temp = global_base;
     while(temp != NULL) 

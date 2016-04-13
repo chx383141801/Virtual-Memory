@@ -94,11 +94,12 @@ int main()
     mutex_init(&mutex);
     my_pthread_create( &my_thread1 );   
     my_pthread_create( &fibonacchi );
+    my_thread1();
     my_pthread_create( &squares );
-    waitForAllThreads();
-    //my_thread1();
+    //waitForAllThreads();
+    
     //fibonacchi();
-    //squares();
+    squares();
     /* The program quits */
     return 0;
 }
