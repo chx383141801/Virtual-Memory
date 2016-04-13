@@ -25,6 +25,7 @@ char d[1024*1024*16];
 char *swap_memory = d;
 int start_index_swap = 0;
 int current_index_swap = 0;
+int i =0;
 
 
 /* The Thread Structure
@@ -49,7 +50,7 @@ typedef struct
 static myThread threadList[ MAX_THREADS ];
 
 /* The index of the currently executing thread----change it to -1 once tested */
-static int currentThread = 0;
+static int currentThread = -1;
 /* A boolean flag indicating if we are in the main process or if we are in a thread */
 static int inThread = 0;
 /* The number of active threads */
@@ -88,13 +89,14 @@ void *getswapmemory(int size)
 		{ m=1;
           startadd[c] = (long int)threadList[i].start_address_swap;
           endadd[c] = (long int)threadList[i].end_address_swap;
+          c++;
 		}
 	}
 	temp= startadd[0];
-    for(i=0;i<numThreads;i++)
+    for(i=0;i<c;i++)
    	{ 
    		position = i;
-       for(j=i+1;j<numThreads;j++)
+       for(j=i+1;j<c;j++)
        {
        	if(startadd[j]<startadd[position])
        	{
@@ -110,7 +112,7 @@ void *getswapmemory(int size)
    }
    if(startadd[i] - (long int)swap_memory >= (long int)size || m==0 )
    	return (void *)swap_memory;
-  for(i=0;i<numThreads;i++)
+  for(i=0;i<c;i++)
   {
     if(startadd[i+1] - endadd[i]>(long int)size)
     	return ((void *)endadd[i]+1);
@@ -121,6 +123,7 @@ return NULL;
 int swapout()
 {
 	void *dest;
+	struct block_meta *temp;
 	int size;
 	int thread;
 	thread = threadToBeSwapped();
@@ -131,6 +134,16 @@ int swapout()
 	if(dest == NULL)
 		return 0;
 	memcpy(dest, threadList[thread].start_address, size);
+	current_index_swap = current_index_swap + size;
+	temp = global_base;
+    while(temp != NULL) 
+    {
+    
+       	if(temp->owner_thread == thread)
+    	temp->free = 1;
+       	temp = temp->next;
+    }
+	printf("\nThread %d swapped out\n", thread);
 
 }
 int threadToBeSwapped()
@@ -200,7 +213,7 @@ void *myallocate_thread(int size)
   		block->size = 4095;
 		block->next = NULL;
 		block->free = 0;
-		block->owner_thread = numThreads;
+		block->owner_thread = currentThread;
 		while(current->owner_thread != currentThread)
 			current = current->next;
 		temp = current->next;
@@ -222,16 +235,23 @@ void *myallocate_thread(int size)
 
 }
 void *myallocate_self(int size)
-{
+{	
 	struct block_meta *block;
 	struct block_meta *last = global_base;
-	if (!global_base) { // First call.
-    block = request_space(NULL, size);
-    if (!block) 
-    {
-      return NULL;
-    }
-    global_base = block;
+	//For test Purpose
+	
+	if((i++)==2)
+		return NULL;
+	
+	if (!global_base) 
+	{ // First call.
+	   
+	   	block = request_space(NULL, size);
+	    if (!block) 
+	    {
+	      return NULL;
+	    }
+	    global_base = block;
     } 
   else {
     block = find_free_block(&last, size);
@@ -273,7 +293,11 @@ void *myallocate(int size, int type) {
   		else
   		{
 	  		if(swapout())
+	  		{
 	  			block = myallocate(size, type);
+	  			block->owner_thread = numThreads;
+	  			return block;
+	  		}
 	  		else
 	  			return NULL;
   		}
