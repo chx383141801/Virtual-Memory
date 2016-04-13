@@ -72,17 +72,73 @@ struct block_meta {
 };
 
 void *global_base = NULL;
-void *global_base_swap = NULL;
 struct block_meta *temp;
 
 #define META_SIZE sizeof(struct block_meta)
-void *getblock(int size)
-{
-	
-}
-int swap()
-{
 
+int swapout()
+{
+	void *dest;
+	int size;
+	int thread;
+	thread = threadToBeSwapped();
+	if(thread == -1)
+		return 0;
+	size = threadList[thread].end_address - threadList[thread].start_address;
+	dest = getswapmemory(size);
+	if(dest == NULL)
+		return 0;
+	memcpy(dest, threadList[thread].start_address, size);
+
+}
+int threadToBeSwapped()
+{
+	struct block_meta *block = global_base;
+	while(block!=NULL && block->owner_thread == currentThread && block->free == 0)
+		block = block->next;
+	if(block == NULL)return -1;
+	return block->owner_thread;
+
+}
+void *getswapmemory(int size)
+{
+	int i,j,position,m=0;
+	long int startadd[numThreads],endadd[numThreads],c=0;
+	long int temp;
+	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
+	for(i=0;i<numThreads;i++)
+	{ 
+		if(threadList[i].swapped == 1)
+		{ m=1;
+          startadd[c] = (long int)threadList[i].start_address_swap;
+          endadd[c] = (long int)threadList[i].end_address_swap;
+		}
+	}
+	temp= startadd[0];
+   for(i=0;i<numThreads;i++)
+   { position = i;
+       for(j=i+1;j<numThreads;j++)
+       {
+       	if(startadd[j]<startadd[position])
+       	{
+       		position = j;
+       	}
+       }
+       if(position!=i)
+       {
+       	temp = startadd[i];
+       	startadd[i] = startadd[position];
+       	startadd[position] = temp;
+       }
+   }
+   if(startadd[i] - (long int)swap_memory >= (long int)size || m==0 )
+   	return swap_memory;
+  for(i=0;i<numThreads;i++)
+  {
+    if(startadd[i+1] - endadd[i]>(long int)size)
+    	return ((void *)endadd[i]+1);
+  }
+return NULL;
 
 }
 void *sbrk1(int nbytes)
@@ -214,7 +270,7 @@ void *myallocate(int size, int type) {
   			return NULL;
   		else
   		{
-	  		if(swap())
+	  		if(swapout())
 	  			block = myallocate(size, type);
 	  		else
 	  			return NULL;
