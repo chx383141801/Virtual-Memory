@@ -76,6 +76,48 @@ struct block_meta *temp;
 
 #define META_SIZE sizeof(struct block_meta)
 
+void *getswapmemory(int size)
+{
+	int i,j,position,m=0;
+	long int startadd[numThreads],endadd[numThreads],c=0;
+	long int temp;
+	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
+	for(i=0;i<numThreads;i++)
+	{ 
+		if(threadList[i].swapped == 1)
+		{ m=1;
+          startadd[c] = (long int)threadList[i].start_address_swap;
+          endadd[c] = (long int)threadList[i].end_address_swap;
+		}
+	}
+	temp= startadd[0];
+    for(i=0;i<numThreads;i++)
+   	{ 
+   		position = i;
+       for(j=i+1;j<numThreads;j++)
+       {
+       	if(startadd[j]<startadd[position])
+       	{
+       		position = j;
+       	}
+       }
+       if(position!=i)
+       {
+       	temp = startadd[i];
+       	startadd[i] = startadd[position];
+       	startadd[position] = temp;
+       }
+   }
+   if(startadd[i] - (long int)swap_memory >= (long int)size || m==0 )
+   	return (void *)swap_memory;
+  for(i=0;i<numThreads;i++)
+  {
+    if(startadd[i+1] - endadd[i]>(long int)size)
+    	return ((void *)endadd[i]+1);
+  }
+return NULL;
+}
+
 int swapout()
 {
 	void *dest;
@@ -100,47 +142,7 @@ int threadToBeSwapped()
 	return block->owner_thread;
 
 }
-void *getswapmemory(int size)
-{
-	int i,j,position,m=0;
-	long int startadd[numThreads],endadd[numThreads],c=0;
-	long int temp;
-	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
-	for(i=0;i<numThreads;i++)
-	{ 
-		if(threadList[i].swapped == 1)
-		{ m=1;
-          startadd[c] = (long int)threadList[i].start_address_swap;
-          endadd[c] = (long int)threadList[i].end_address_swap;
-		}
-	}
-	temp= startadd[0];
-   for(i=0;i<numThreads;i++)
-   { position = i;
-       for(j=i+1;j<numThreads;j++)
-       {
-       	if(startadd[j]<startadd[position])
-       	{
-       		position = j;
-       	}
-       }
-       if(position!=i)
-       {
-       	temp = startadd[i];
-       	startadd[i] = startadd[position];
-       	startadd[position] = temp;
-       }
-   }
-   if(startadd[i] - (long int)swap_memory >= (long int)size || m==0 )
-   	return swap_memory;
-  for(i=0;i<numThreads;i++)
-  {
-    if(startadd[i+1] - endadd[i]>(long int)size)
-    	return ((void *)endadd[i]+1);
-  }
-return NULL;
 
-}
 void *sbrk1(int nbytes)
 {	
 	void *base;
