@@ -21,6 +21,11 @@ char *memory = c;
 int start_index = 0;
 int current_index = 0;
 
+char d[1024*1024*16];
+char *swap_memory = d;
+int start_index_swap = 0;
+int current_index_swap = 0;
+
 
 /* The Thread Structure
 *  Contains the information about individual threads.
@@ -35,6 +40,10 @@ typedef struct
 	void *start_address;
 	void *end_address;
 	int current_index;
+	int swapped;
+	int page_count;
+	void *start_address_swap;
+	void *end_address_swap;
 } myThread;
 /* The thread "queue" */
 static myThread threadList[ MAX_THREADS ];
@@ -63,8 +72,19 @@ struct block_meta {
 };
 
 void *global_base = NULL;
+void *global_base_swap = NULL;
+struct block_meta *temp;
 
 #define META_SIZE sizeof(struct block_meta)
+void *getblock(int size)
+{
+	
+}
+int swap()
+{
+
+
+}
 void *sbrk1(int nbytes)
 {	
 	void *base;
@@ -176,6 +196,7 @@ void *myallocate_self(int size)
 void *myallocate(int size, int type) {
   
   struct block_meta *block;
+  int i;
   if (size <= 0 || size >= 4096) {
     return NULL;
   }
@@ -187,6 +208,18 @@ void *myallocate(int size, int type) {
   else
   {
   	block = myallocate_self(size);
+  	if(block==NULL)
+  	{	
+  		if(current_index_swap + size > 16777216)
+  			return NULL;
+  		else
+  		{
+	  		if(swap())
+	  			block = myallocate(size, type);
+	  		else
+	  			return NULL;
+  		}
+  	}
   }
   block->owner_thread = numThreads;
   return(block + 1);
@@ -233,6 +266,8 @@ void initThreads()
 	{
 		threadList[i].active = 0;
 		threadList[i].priority = 0;
+		threadList[i].swapped = 0;
+		threadList[i].page_count = 0;
 	}
 		
 	return;
@@ -326,6 +361,17 @@ void my_pthread_yield(int priority_thread)
 			/* Free the "current" thread's stack */
 			free( threadList[currentThread].stack );
 			
+
+            temp = global_base;
+            while(temp != NULL) 
+            {
+    
+                if(temp->owner_thread == currentThread)
+    	              temp->free = 1;
+                temp = temp->next;
+            }
+ 			printf("Freed\n");
+
 			/* Swap the last thread with the current, now empty, entry */
 			-- numThreads;
 			if(threadList[currentThread].priority ==0)
@@ -365,9 +411,9 @@ int my_pthread_create( void (*func)(void) )
 	threadList[numThreads].end_address = threadList[numThreads].start_address + 4095;
 	threadList[numThreads].current_index = 0;
 	
-	if ( threadList[numThreads].stack == 0 )
+	if ( threadList[numThreads].stack == 0 || threadList[numThreads].start_address == NULL)
 	{
-		LF_DEBUG_OUT( "Error: Could not allocate stack." );
+		LF_DEBUG_OUT( "Error: Could not allocate stack. or heapspace" );
 		return LF_MALLOCERROR;
 	}
 	
